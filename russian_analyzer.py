@@ -17,12 +17,16 @@ class RussianTextAnalyzer:
         # Define Russian vowels
         self.vowels = set('аеёиоуыэюя')
         # Russian stopwords (common words that don't carry much meaning)
-        # self.stopwords = set(['и', 'в', 'во', 'не', 'что', 'он', 'на', 'я', 'с', 'со', 'как', 'а', 'то', 'все', 'она', 'так', 'его', 'но', 'да', 'ты', 'к', 'у', 'же', 'вы', 'за', 'бы', 'по', 'только', 'ее', 'мне', 'было', 'вот', 'от', 'меня', 'еще', 'нет', 'о', 'из', 'ему'])
         self.stopwords = set(['ее'])
         # Initialize HTML to text converter
         self.html_converter = html2text.HTML2Text()
         self.html_converter.ignore_links = True
         self.html_converter.ignore_images = True
+
+    def read_text_file(self, file_path: str) -> str:
+        """Read text content from a plain text file."""
+        with open(file_path, 'r', encoding='utf-8') as f:
+            return f.read()
 
     def extract_text_from_epub(self, epub_path: str) -> str:
         """Extract text content from an EPUB file."""
@@ -37,6 +41,16 @@ class RussianTextAnalyzer:
             text_content.append(content)
 
         return '\n'.join(text_content)
+
+    def read_file(self, file_path: str) -> str:
+        """Read content from either a text file or EPUB file."""
+        file_extension = Path(file_path).suffix.lower()
+        if file_extension == '.epub':
+            return self.extract_text_from_epub(file_path)
+        elif file_extension in ['.txt', '.text']:
+            return self.read_text_file(file_path)
+        else:
+            raise ValueError(f"Unsupported file format: {file_extension}")
 
     def clean_text(self, text: str) -> str:
         """Remove punctuation and extra whitespace."""
@@ -198,21 +212,21 @@ class RussianTextAnalyzer:
                 f.write(f"  {word} ({len(word)} characters)\n")
 
 def main():
-    parser = argparse.ArgumentParser(description='Analyze Russian text from EPUB file')
-    parser.add_argument('epub_path', type=str, help='Path to EPUB file')
+    parser = argparse.ArgumentParser(description='Analyze Russian text from file')
+    parser.add_argument('input_path', type=str, help='Path to input file (EPUB or TXT)')
     parser.add_argument('--output', '-o', type=str, help='Path to output file for analysis results', 
                       default='analysis_results.txt')
     args = parser.parse_args()
 
-    if not Path(args.epub_path).exists():
-        print(f"Error: File '{args.epub_path}' not found.")
+    if not Path(args.input_path).exists():
+        print(f"Error: File '{args.input_path}' not found.")
         return
 
     analyzer = RussianTextAnalyzer()
 
     try:
-        print("Extracting text from EPUB...")
-        text = analyzer.extract_text_from_epub(args.epub_path)
+        print(f"Reading file {args.input_path}...")
+        text = analyzer.read_file(args.input_path)
         
         print("Analyzing text...")
         results = analyzer.analyze_text(text)
