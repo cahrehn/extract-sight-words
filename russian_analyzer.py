@@ -69,24 +69,24 @@ class RussianTextAnalyzer:
             words = [self.get_lemma(w) for w in words]
         return Counter(words).most_common()
 
-    def calculate_coverage(self, word_frequencies: List[Tuple[str, int]], target_percentage: float = 0.6) -> Dict:
-        """Calculate how many words are needed to reach the target coverage percentage."""
+    def calculate_coverage(self, word_frequencies: List[Tuple[str, int]], target_words: int = 100) -> Dict:
+        """Calculate the coverage achieved by learning the top N words."""
         total_words = sum(count for _, count in word_frequencies)
         cumulative_count = 0
-        words_needed = 0
         
-        for i, (word, count) in enumerate(word_frequencies, 1):
-            cumulative_count += count
-            coverage = cumulative_count / total_words
-            if coverage >= target_percentage:
-                words_needed = i
-                break
+        # Take only the specified number of top words
+        top_words = word_frequencies[:target_words]
+        cumulative_count = sum(count for _, count in top_words)
         
         return {
-            'words_needed': words_needed,
+            'target_words': target_words,
             'coverage_achieved': cumulative_count / total_words,
             'total_unique_words': len(word_frequencies),
-            'total_word_occurrences': total_words
+            'total_word_occurrences': total_words,
+            'cumulative_frequencies': [
+                (i + 1, sum(count for _, count in word_frequencies[:i+1]) / total_words)
+                for i in range(min(target_words, len(word_frequencies)))
+            ]
         }
 
     def get_pos_distribution(self, text: str) -> Dict[str, int]:
@@ -108,8 +108,8 @@ class RussianTextAnalyzer:
         
         # Get lemmatized word frequencies and coverage
         word_frequencies = self.get_word_frequency(text, use_lemmas=True)
-        common_words = word_frequencies[:40]
-        coverage_stats = self.calculate_coverage(word_frequencies, 0.6)
+        common_words = word_frequencies[:100]
+        coverage_stats = self.calculate_coverage(word_frequencies, 100)
         
         # Calculate word and sentence statistics
         unique_words = len(set(words))
@@ -184,10 +184,14 @@ class RussianTextAnalyzer:
             
             f.write("\nWord Coverage Analysis:\n")
             coverage = analysis['coverage_stats']
-            f.write(f"  Words needed for 60% coverage: {coverage['words_needed']}\n")
-            f.write(f"  Actual coverage achieved: {coverage['coverage_achieved']:.2%}\n")
+            f.write(f"  Coverage with top {coverage['target_words']} words: {coverage['coverage_achieved']:.2%}\n")
             f.write(f"  Total unique words: {coverage['total_unique_words']}\n")
             f.write(f"  Total word occurrences: {coverage['total_word_occurrences']}\n")
+            
+            f.write("\nCumulative Coverage by Word Count:\n")
+            for words, coverage in coverage['cumulative_frequencies']:
+                if words % 10 == 0 or words == 1:  # Show at word 1 and every 10 words
+                    f.write(f"  Top {words:3d} words: {coverage:.2%}\n")
             
             f.write("\nLongest words:\n")
             for word in analysis['longest_words']:
