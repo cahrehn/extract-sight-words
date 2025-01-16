@@ -66,10 +66,6 @@ class RussianTextAnalyzer:
         """Get the base form (lemma) of a word."""
         return self.morph.parse(word)[0].normal_form
 
-    def get_pos(self, word: str) -> str:
-        """Get the part of speech of a word."""
-        return self.morph.parse(word)[0].tag.POS
-
     def count_syllables(self, word: str) -> int:
         """Count syllables in a Russian word."""
         return sum(1 for letter in word.lower() if letter in self.vowels)
@@ -103,18 +99,6 @@ class RussianTextAnalyzer:
             ]
         }
 
-    def get_pos_distribution(self, text: str) -> Dict[str, int]:
-        """Get distribution of parts of speech."""
-        words = self.get_words(text)
-        pos_counts = Counter()
-        
-        for word in words:
-            pos = self.get_pos(word)
-            if pos:  # Some words might not have a clear POS
-                pos_counts[pos] += 1
-            
-        return dict(pos_counts.most_common())
-
     def analyze_text(self, text: str) -> Dict:
         """Perform comprehensive analysis of the text."""
         words = self.get_words(text)
@@ -125,14 +109,9 @@ class RussianTextAnalyzer:
         common_words = word_frequencies[:100]
         coverage_stats = self.calculate_coverage(word_frequencies, 100)
         
-        # Calculate word and sentence statistics
+        # Calculate word statistics
         unique_words = len(set(words))
-        avg_word_length = sum(len(word) for word in words) / word_count if word_count > 0 else 0
         total_syllables = sum(self.count_syllables(word) for word in words)
-        avg_syllables = total_syllables / word_count if word_count > 0 else 0
-        
-        # Get parts of speech distribution
-        pos_dist = self.get_pos_distribution(text)
         
         # Get lemma to word form mapping for common words
         common_lemmas = {}
@@ -147,41 +126,23 @@ class RussianTextAnalyzer:
         return {
             'total_words': word_count,
             'unique_words': unique_words,
-            'vocabulary_richness': unique_words / word_count if word_count > 0 else 0,
-            'avg_word_length': round(avg_word_length, 2),
-            'avg_syllables': round(avg_syllables, 2),
+
+
             'total_syllables': total_syllables,
             'most_common_lemmas': common_words,
             'lemma_forms': common_lemmas,
-            'pos_distribution': pos_dist,
-            'coverage_stats': coverage_stats,
-            'longest_words': sorted(set(words), key=len, reverse=True)[:10]
+            'coverage_stats': coverage_stats
         }
 
     def save_analysis_to_file(self, analysis: Dict, output_path: str):
         """Save analysis results to a text file."""
-        pos_names = {
-            'NOUN': 'Noun',
-            'VERB': 'Verb',
-            'ADJF': 'Adjective',
-            'ADJS': 'Short Adjective',
-            'ADVB': 'Adverb',
-            'PREP': 'Preposition',
-            'CONJ': 'Conjunction',
-            'PRTF': 'Participle',
-            'PRTS': 'Short Participle',
-            'INFN': 'Infinitive',
-            'PRCL': 'Particle',
-            'INTJ': 'Interjection'
-        }
 
         with open(output_path, 'w', encoding='utf-8') as f:
             f.write("=== Text Analysis Results ===\n\n")
             f.write(f"Total words: {analysis['total_words']}\n")
             f.write(f"Unique words: {analysis['unique_words']}\n")
-            f.write(f"Vocabulary richness: {analysis['vocabulary_richness']:.2%}\n")
-            f.write(f"Average word length: {analysis['avg_word_length']} characters\n")
-            f.write(f"Average syllables per word: {analysis['avg_syllables']}\n")
+
+
             
             f.write("\nMost frequent lemmas (base forms):\n")
             for lemma, count in analysis['most_common_lemmas']:
@@ -189,12 +150,6 @@ class RussianTextAnalyzer:
                 f.write(f"  {lemma} ({count} occurrences)\n")
                 if forms:
                     f.write(f"    Word forms found: {', '.join(forms)}\n")
-            
-            f.write("\nParts of speech distribution:\n")
-            for pos, count in analysis['pos_distribution'].items():
-                pos_name = pos_names.get(pos, pos)
-                percentage = count / analysis['total_words'] * 100
-                f.write(f"  {pos_name}: {count} ({percentage:.1f}%)\n")
             
             f.write("\nWord Coverage Analysis:\n")
             coverage = analysis['coverage_stats']
@@ -206,10 +161,6 @@ class RussianTextAnalyzer:
             for words, coverage in coverage['cumulative_frequencies']:
                 if words % 10 == 0 or words == 1:  # Show at word 1 and every 10 words
                     f.write(f"  Top {words:3d} words: {coverage:.2%}\n")
-            
-            f.write("\nLongest words:\n")
-            for word in analysis['longest_words']:
-                f.write(f"  {word} ({len(word)} characters)\n")
 
 def main():
     parser = argparse.ArgumentParser(description='Analyze Russian text from file')
