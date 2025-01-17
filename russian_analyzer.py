@@ -57,8 +57,8 @@ class RussianTextAnalyzer:
         text = ''.join(char for char in text if char not in punctuation)
         return ' '.join(text.split()).lower()
 
-    def get_words(self, text: str) -> List[str]:
-        """Split text into words."""
+    def extract_words(self, text: str) -> List[str]:
+        """Extract individual words from text."""
         clean = self.clean_text(text)
         return [word for word in clean.split() if any(c.isalpha() for c in word)]
 
@@ -70,68 +70,66 @@ class RussianTextAnalyzer:
         """Count syllables in a Russian word."""
         return sum(1 for letter in word.lower() if letter in self.vowels)
 
-    def get_word_frequency(self, text: str, exclude_stopwords: bool = True, use_lemmas: bool = True) -> List[Tuple[str, int]]:
-        """Get word frequency sorted by count."""
-        words = self.get_words(text)
+    def get_frequency_distribution(self, text: str, exclude_stopwords: bool = True, lemmatize: bool = True) -> List[Tuple[str, int]]:
+        """Get frequency distribution of either words or lemmas."""
+        words = self.extract_words(text)
         if exclude_stopwords:
             words = [w for w in words if w not in self.stopwords]
-        if use_lemmas:
-            words = [self.get_lemma(w) for w in words]
-        return Counter(words).most_common()
+        if lemmatize:
+            items = [self.get_lemma(w) for w in words]
+        else:
+            items = words
+        return Counter(items).most_common()
 
-    def calculate_coverage(self, word_frequencies: List[Tuple[str, int]], target_words: int = 100) -> Dict:
-        """Calculate the coverage achieved by learning the top N words."""
-        total_words = sum(count for _, count in word_frequencies)
-        cumulative_count = 0
+    def calculate_vocabulary_coverage(self, frequency_distribution: List[Tuple[str, int]], target_items: int = 100) -> Dict:
+        """Calculate the coverage achieved by learning the top N items (words or lemmas)."""
+        total_occurrences = sum(count for _, count in frequency_distribution)
         
-        # Take only the specified number of top words
-        top_words = word_frequencies[:target_words]
-        cumulative_count = sum(count for _, count in top_words)
+        # Take only the specified number of top items
+        top_items = frequency_distribution[:target_items]
+        cumulative_count = sum(count for _, count in top_items)
         
         return {
-            'target_words': target_words,
-            'coverage_achieved': cumulative_count / total_words,
-            'total_unique_words': len(word_frequencies),
-            'total_word_occurrences': total_words,
+            'target_items': target_items,
+            'coverage_percentage': cumulative_count / total_occurrences,
+            'total_unique_items': len(frequency_distribution),
+            'total_occurrences': total_occurrences,
             'cumulative_frequencies': [
-                (i + 1, sum(count for _, count in word_frequencies[:i+1]) / total_words)
-                for i in range(min(target_words, len(word_frequencies)))
+                (i + 1, sum(count for _, count in frequency_distribution[:i+1]) / total_occurrences)
+                for i in range(min(target_items, len(frequency_distribution)))
             ]
         }
 
     def analyze_text(self, text: str) -> Dict:
         """Perform comprehensive analysis of the text."""
-        words = self.get_words(text)
-        word_count = len(words)
+        # Extract and count raw words
+        words = self.extract_words(text)
+        raw_word_count = len(words)
         
-        # Get lemmatized word frequencies and coverage
-        word_frequencies = self.get_word_frequency(text, use_lemmas=True)
-        common_words = word_frequencies[:100]
-        coverage_stats = self.calculate_coverage(word_frequencies, 100)
+        # Get lemmatized frequency distribution and coverage
+        lemma_frequencies = self.get_frequency_distribution(text, lemmatize=True)
+        common_lemmas = lemma_frequencies[:100]
+        lemma_coverage = self.calculate_vocabulary_coverage(lemma_frequencies, 100)
         
-        # Calculate word statistics
+        # Calculate statistics
         unique_words = len(set(words))
-        total_syllables = sum(self.count_syllables(word) for word in words)
         
-        # Get lemma to word form mapping for common words
-        common_lemmas = {}
-        for lemma, count in common_words:
+        # Map lemmas to their word forms for common lemmas
+        lemma_to_wordforms = {}
+        for lemma, count in common_lemmas:
             # Find original word forms for this lemma
             word_forms = set()
             for word in words:
                 if self.get_lemma(word) == lemma:
                     word_forms.add(word)
-            common_lemmas[lemma] = list(word_forms)
+            lemma_to_wordforms[lemma] = list(word_forms)
 
         return {
-            'total_words': word_count,
-            'unique_words': unique_words,
-
-
-            'total_syllables': total_syllables,
-            'most_common_lemmas': common_words,
-            'lemma_forms': common_lemmas,
-            'coverage_stats': coverage_stats
+            'raw_word_count': raw_word_count,
+            'unique_word_count': unique_words,
+            'common_lemmas': common_lemmas,
+            'wordforms_by_lemma': lemma_to_wordforms,
+            'lemma_coverage': lemma_coverage
         }
 
     def save_analysis_to_file(self, analysis: Dict, output_path: str):
@@ -139,28 +137,26 @@ class RussianTextAnalyzer:
 
         with open(output_path, 'w', encoding='utf-8') as f:
             f.write("=== Text Analysis Results ===\n\n")
-            f.write(f"Total words: {analysis['total_words']}\n")
-            f.write(f"Unique words: {analysis['unique_words']}\n")
-
-
+            f.write(f"Raw word count: {analysis['raw_word_count']}\n")
+            f.write(f"Unique words: {analysis['unique_word_count']}\n")
             
-            f.write("\nMost frequent lemmas (base forms):\n")
-            for lemma, count in analysis['most_common_lemmas']:
-                forms = analysis['lemma_forms'].get(lemma, [])
+            f.write("\nMost common lemmas:\n")
+            for lemma, count in analysis['common_lemmas']:
+                forms = analysis['wordforms_by_lemma'].get(lemma, [])
                 f.write(f"  {lemma} ({count} occurrences)\n")
                 if forms:
                     f.write(f"    Word forms found: {', '.join(forms)}\n")
+                        
+            f.write("\nLemma Coverage Analysis:\n")
+            coverage = analysis['lemma_coverage']
+            f.write(f"  Coverage with top {coverage['target_items']} lemmas: {coverage['coverage_percentage']:.2%}\n")
+            f.write(f"  Total unique lemmas: {coverage['total_unique_items']}\n")
+            f.write(f"  Total word occurrences: {coverage['total_occurrences']}\n")
             
-            f.write("\nWord Coverage Analysis:\n")
-            coverage = analysis['coverage_stats']
-            f.write(f"  Coverage with top {coverage['target_words']} words: {coverage['coverage_achieved']:.2%}\n")
-            f.write(f"  Total unique words: {coverage['total_unique_words']}\n")
-            f.write(f"  Total word occurrences: {coverage['total_word_occurrences']}\n")
-            
-            f.write("\nCumulative Coverage by Word Count:\n")
-            for words, coverage in coverage['cumulative_frequencies']:
-                if words % 10 == 0 or words == 1:  # Show at word 1 and every 10 words
-                    f.write(f"  Top {words:3d} words: {coverage:.2%}\n")
+            f.write("\nCumulative Coverage by Lemma Count:\n")
+            for items, coverage in coverage['cumulative_frequencies']:
+                if items % 10 == 0 or items == 1:  # Show at item 1 and every 10 items
+                    f.write(f"  Top {items:3d} lemmas: {coverage:.2%}\n")
 
 def main():
     parser = argparse.ArgumentParser(description='Analyze Russian text from file')
