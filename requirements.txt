@@ -1,6 +1,2 @@
-pymorphy2>=0.9.1
-DAWG-Python>=0.7.2
-pymorphy2-dicts-ru>=2.4.417127.4579844
-ebooklib>=0.18
-beautifulsoup4>=4.12.0
-html2text>=2020.1.16
+ebooklib==0.18.1
+beautifulsoup4==4.12.3
